@@ -4,6 +4,7 @@ import numpy as np
 import imutils
 import argparse
 import pigpio
+import math
 
 #import RPi.GPIO as GPIO
 import time
@@ -37,16 +38,11 @@ sleep(2)
 pi.set_servo_pulsewidth(17, 0)
 pi.set_servo_pulsewidth(27, 0)
 
+xpidangle = 1500
+ypidangle = 1500
 
-#servo1 = GPIO.PWM(11,50)
-#servo2 = GPIO.PWM(13,50)
-#servo1.start(6)
-#servo2.start(6)
-
-
-
-xservopos = 1500
-yservopos = 1500
+xtarget = 300
+ytarget = 250
 
 Kp = 1
 Kd = 0.75
@@ -55,10 +51,87 @@ errpx = 0
 erry = 0
 errpy = 0
 
-while True:
-    
-    
+xmodel = 0
+ymodel = 0
 
+i = 0
+delay = 10
+delayedx = 0
+delayedy = 0
+xrdelay = 0
+yrdelay = 0
+delaylistx = []
+delaylisty = []
+
+class BallModel:
+    
+    def __init__(self,x,y):
+        self.x = x
+        self.y = y
+        self.mass = 1
+        self.grav = 9.81
+        self.speed = 0
+        self.xv = 0
+        self.yv = 0
+        
+        
+    def draw(self, x, y, screen):
+        
+        cv2.circle(screen, (int(self.x), int(self.y)), 10, (0,0,255))
+        
+    def move(self):
+        
+        #friction
+        self.speed -= (self.speed)/50
+
+        #stop if movement is slow
+        if self.speed <= .01:
+            self.speed = 0
+            
+        #Get servo pose
+        slidexangle = -xpidangle*3.14/750+2*3.14
+        slideyangle = -ypidangle*3.14/750+2*3.14
+        
+        print ("xangle: " ,slidexangle)
+            
+        # Acceleration calculation
+        self.xF = self.mass * self.grav * math.sin(slidexangle)
+        self.yF = self.mass * self.grav * math.sin(slideyangle)
+        
+        print ("xforce: " ,self.xF)
+
+        #Acceleration calculation
+        self.xa = self.xF/self.mass
+        self.ya = self.yF/self.mass
+
+        #Velocity calculation
+        self.xv += self.xa
+        self.yv += self.ya
+        
+        #change position with velocity
+        self.x += self.xv
+        self.y = 250#self.y + self.yv
+        
+        if self.x < 150:
+            self.x = 150
+        if self.y < 100:
+            self.y = 100
+        if self.x > 450:
+            self.x = 450
+        if self.y > 400:
+            self.y = 400
+            
+        
+    
+modelBall = BallModel(200,200)
+loop = True
+
+while loop:
+    
+    
+    
+    
+    
     l_orange = np.array([45,100,50])
     u_orange = np.array([75,255,255])
     
@@ -93,42 +166,66 @@ while True:
                 cv2.circle(rotated, (int(x), int(y)), int(radius),
                     (0, 255, 255), 2)
                 cv2.circle(rotated, center, 5, (0, 0, 255), -1)
+                modelBall.move()
+                
                 xr = round(x,1)
                 yr = round(y,1)
+                
+                delaylistx.append(modelBall.x)
+                delaylisty.append(yr)
+                
+                if i > delay:
+                    delayedx = delaylistx.pop(0)
+                    delayedy = delaylisty.pop(0)
+                i += 1
+                
+                xdelayedx = xr - delayedx
+                ydelayedy = yr - delayedy
+                
                 cv2.putText(rotated, ("position x %s " % xr+"position y %s" % yr), (10,20), cv2.FONT_HERSHEY_SIMPLEX, 1, (255,255,0), 2)
                 
+                xrsum = modelBall.x + xdelayedx
+                yrsum = modelBall.y + ydelayedy
                 
-                errx = (xr) - 300
+                errx = xtarget - (xrsum)
                 errdx = errx - errpx
                 errpx = errx
                 
-                erry = (yr) - 250
+                erry = ytarget - (yrsum)
                 errdy = erry - errpy
                 errpy = erry
                 
-                xservopos = ((Kp * errx + Kd * (errpx)) * 5 + 1500)
-                yservopos = ((Kp * erry + Kd * (errpy)) * 5 + 1750)
+                xpidangle = ((Kp * errx + Kd * (errdx)) * 5 + 1500)
+                ypidangle = ((Kp * erry + Kd * (errdy)) * 5 + 1750)
                 
                 
-                if xservopos < 500:
-                    xservopos = 500
-                if yservopos < 500:
-                    yservopos = 500
-                if xservopos > 2500:
-                    xservopos = 2500
-                if yservopos > 2500:
-                    yservopos = 2500
+                if xpidangle < 800:
+                    xpidangle = 800
+                if ypidangle < 750:
+                    ypidangle = 750
+                if xpidangle > 2200:
+                    xpidangle = 2200
+                if ypidangle > 2250:
+                    ypidangle = 2250
+                    
                 
-                print (xservopos)
-                print (yservopos)
-                pi.set_servo_pulsewidth(17, xservopos)
-                pi.set_servo_pulsewidth(27, yservopos)
                 
-                print (time)
+                modelBall.draw(modelBall.x,modelBall.y,rotated)
+                
+                pi.set_servo_pulsewidth(17, xpidangle)
+                pi.set_servo_pulsewidth(27, 1500) #ypidangle)
+                
+                #print (time)
+                
+        else:
+            pi.set_servo_pulsewidth(17, 1500)
+            pi.set_servo_pulsewidth(27, 1500)
                 
                 #pi.stop()
                 
         pts.appendleft(center)
+        
+        
         
         cv2.imshow("Window 1",rotated)
         #cv2.imshow("Window 2",final)
