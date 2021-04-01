@@ -81,45 +81,48 @@ class BallModel:
         
     def move(self):
         
-        #friction
-        self.speed -= (self.speed)/50
-
-        #stop if movement is slow
-        if self.speed <= .01:
-            self.speed = 0
+        if ((450 >= self.x >= 150) & (400 >= self.x >= 100)):
             
-        #Get servo pose
-        slidexangle = -xpidangle*3.14/750+2*3.14
-        slideyangle = -ypidangle*3.14/750+2*3.14
-        
-        print ("xangle: " ,slidexangle)
+            #friction [beta]
+            self.speed -= (self.speed)/50
+
+            #stop if movement is slow
+            if self.speed <= .01:
+                self.speed = 0
+                
+            #get servo pose
+            xradian = -xpidangle*3.14/750+2*3.14
+            print(xradian)
+            yradian = -ypidangle*3.14/750+2*3.14
             
-        # Acceleration calculation
-        self.xF = self.mass * self.grav * math.sin(slidexangle)
-        self.yF = self.mass * self.grav * math.sin(slideyangle)
-        
-        print ("xforce: " ,self.xF)
+            print ("xangle: " ,xradian)
+                
+            # Acceleration calculation
+            self.xF = self.mass * self.grav * math.sin(xradian)
+            self.yF = self.mass * self.grav * math.sin(yradian)
+            
+            print ("xforce: " ,self.xF)
 
-        #Acceleration calculation
-        self.xa = self.xF/self.mass
-        self.ya = self.yF/self.mass
+            #Acceleration calculation
+            self.xa = self.xF/self.mass
+            self.ya = self.yF/self.mass
 
-        #Velocity calculation
-        self.xv += self.xa
-        self.yv += self.ya
-        
-        #change position with velocity
-        self.x += self.xv
-        self.y = 250#self.y + self.yv
-        
-        if self.x < 150:
-            self.x = 150
-        if self.y < 100:
-            self.y = 100
-        if self.x > 450:
-            self.x = 450
-        if self.y > 400:
-            self.y = 400
+            #Velocity calculation
+            self.xv += self.xa/20
+            self.yv += self.ya/20
+            
+            #change position with velocity
+            self.x += self.xv
+            self.y = 250#self.y + self.yv
+            
+            if self.x < 150:
+                self.x = 150
+            if self.y < 100:
+                self.y = 100
+            if self.x > 450:
+                self.x = 450
+            if self.y > 400:
+                self.y = 400
             
         
     
@@ -127,10 +130,6 @@ modelBall = BallModel(200,200)
 loop = True
 
 while loop:
-    
-    
-    
-    
     
     l_orange = np.array([45,100,50])
     u_orange = np.array([75,255,255])
@@ -234,6 +233,9 @@ while loop:
 
         
         cv2.waitKey(1)
+        
+        
+        
         
     else:
         print("The camera is not working!")
