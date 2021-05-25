@@ -10,6 +10,12 @@ import math
 import time
 from time import sleep
 
+import tkinter as tk
+
+window = tk.Tk()
+
+#os.system("sudo pigpiod")
+
 
 ap = argparse.ArgumentParser()
 ap.add_argument("-b", "--buffer", type=int, default=64, help="max buffer size")
@@ -20,9 +26,6 @@ cam = cv2.VideoCapture(-1)
 
 #GPIO.setmode(GPIO.BOARD)
 pi = pigpio.pi()
-
-
-
 
 #GPIO.setup(11,GPIO.OUT)
 #GPIO.setup(13,GPIO.OUT)
@@ -42,14 +45,27 @@ xpidangle = 1500
 ypidangle = 1500
 
 xtarget = 300
-ytarget = 250
+ytarget = 230
 
-Kp = 1
-Kd = 0.75
+Kp = 0.5 #best0.5
+Ki = 0.02 #best0.01
+Kd = 8 #best8
 errx = 0
+erix = 0
 errpx = 0
 erry = 0
+eriy = 0
 errpy = 0
+
+#xmin = 800
+#ymin = 750
+#xmax = 2200
+#ymax = 2250
+
+xmin = 1300
+ymin = 1300
+xmax = 1700
+ymax = 1700
 
 xmodel = 0
 ymodel = 0
@@ -63,76 +79,26 @@ yrdelay = 0
 delaylistx = []
 delaylisty = []
 
-class BallModel:
-    
-    def __init__(self,x,y):
-        self.x = x
-        self.y = y
-        self.mass = 1
-        self.grav = 9.81
-        self.speed = 0
-        self.xv = 0
-        self.yv = 0
-        
-        
-    def draw(self, x, y, screen):
-        
-        cv2.circle(screen, (int(self.x), int(self.y)), 10, (0,0,255))
-        
-    def move(self):
-        
-        if ((450 >= self.x >= 150) & (400 >= self.x >= 100)):
-            
-            #friction [beta]
-            self.speed -= (self.speed)/50
 
-            #stop if movement is slow
-            if self.speed <= .01:
-                self.speed = 0
-                
-            #get servo pose
-            xradian = -xpidangle*3.14/750+2*3.14
-            print(xradian)
-            yradian = -ypidangle*3.14/750+2*3.14
-            
-            print ("xangle: " ,xradian)
-                
-            # Acceleration calculation
-            self.xF = self.mass * self.grav * math.sin(xradian)
-            self.yF = self.mass * self.grav * math.sin(yradian)
-            
-            print ("xforce: " ,self.xF)
-
-            #Acceleration calculation
-            self.xa = self.xF/self.mass
-            self.ya = self.yF/self.mass
-
-            #Velocity calculation
-            self.xv += self.xa/20
-            self.yv += self.ya/20
-            
-            #change position with velocity
-            self.x += self.xv
-            self.y = 250#self.y + self.yv
-            
-            if self.x < 150:
-                self.x = 150
-            if self.y < 100:
-                self.y = 100
-            if self.x > 450:
-                self.x = 450
-            if self.y > 400:
-                self.y = 400
-            
-        
-    
-modelBall = BallModel(200,200)
 loop = True
 
 while loop:
     
-    l_orange = np.array([45,100,50])
-    u_orange = np.array([75,255,255])
+    #yellow
+    #l_orange = np.array([30,30,80])
+    #u_orange = np.array([35,225,205])
+      
+    #?green
+    #l_orange = np.array([0,0,100])
+    #u_orange = np.array([255,100,255])
+    
+    #dark blue
+    #l_orange = np.array([200,0,50])
+    #u_orange = np.array([255,255,75])
+    
+    #red
+    l_orange = np.array([0,50,0])
+    u_orange = np.array([10,255,255])
     
     b, img = cam.read()
     
@@ -165,54 +131,61 @@ while loop:
                 cv2.circle(rotated, (int(x), int(y)), int(radius),
                     (0, 255, 255), 2)
                 cv2.circle(rotated, center, 5, (0, 0, 255), -1)
-                modelBall.move()
+                #modelBall.move()
                 
                 xr = round(x,1)
                 yr = round(y,1)
                 
-                delaylistx.append(modelBall.x)
-                delaylisty.append(yr)
+                #delaylistx.append(modelBall.x)
+                #delaylisty.append(yr)
                 
-                if i > delay:
-                    delayedx = delaylistx.pop(0)
-                    delayedy = delaylisty.pop(0)
-                i += 1
+                #if i > delay:
+                    #delayedx = delaylistx.pop(0)
+                    #delayedy = delaylisty.pop(0)
+                #i += 1
                 
-                xdelayedx = xr - delayedx
-                ydelayedy = yr - delayedy
+                #xdelayedx = xr - delayedx
+                #ydelayedy = yr - delayedy
                 
                 cv2.putText(rotated, ("position x %s " % xr+"position y %s" % yr), (10,20), cv2.FONT_HERSHEY_SIMPLEX, 1, (255,255,0), 2)
                 
-                xrsum = modelBall.x + xdelayedx
-                yrsum = modelBall.y + ydelayedy
+                xrsum = xr#modelBall.x# + xdelayedx
+                yrsum = yr#modelBall.y# + ydelayedy
                 
-                errx = xtarget - (xrsum)
+                errx = -xtarget + (xrsum)
+                erix = erix + errx
+                if (erix > 30):
+                    erix = 30
                 errdx = errx - errpx
                 errpx = errx
                 
                 erry = ytarget - (yrsum)
+                eriy = eriy + erry
+                if (eriy > 100):
+                    eriy = 100
                 errdy = erry - errpy
                 errpy = erry
                 
-                xpidangle = ((Kp * errx + Kd * (errdx)) * 5 + 1500)
-                ypidangle = ((Kp * erry + Kd * (errdy)) * 5 + 1750)
+                xpidangle = ((Kp * errx + Ki * erix + Kd * (errdx)) * 1.5 + 1500)
+                #xpidangle = 1500
+                #ypidangle = 1500
+                ypidangle = ((Kp * erry + Ki * eriy + Kd * (errdy)) * 1.5 + 1500)
                 
                 
-                if xpidangle < 800:
-                    xpidangle = 800
-                if ypidangle < 750:
-                    ypidangle = 750
-                if xpidangle > 2200:
-                    xpidangle = 2200
-                if ypidangle > 2250:
-                    ypidangle = 2250
-                    
+                if xpidangle < xmin:
+                    xpidangle = xmin
+                if ypidangle < ymin:
+                    ypidangle = ymin
+                if xpidangle > xmax:
+                    xpidangle = xmax
+                if ypidangle > ymax:
+                    ypidangle = ymax
+
                 
-                
-                modelBall.draw(modelBall.x,modelBall.y,rotated)
-                
+                #modelBall.draw(modelBall.x,modelBall.y,rotated)
+                print(xpidangle)
                 pi.set_servo_pulsewidth(17, xpidangle)
-                pi.set_servo_pulsewidth(27, 1500) #ypidangle)
+                pi.set_servo_pulsewidth(27, ypidangle)
                 
                 #print (time)
                 
