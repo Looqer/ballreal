@@ -5,6 +5,7 @@ import imutils
 import argparse
 import pigpio
 import math
+from adafruit_servokit import ServoKit
 
 #import RPi.GPIO as GPIO
 import time
@@ -13,6 +14,8 @@ from time import sleep
 import tkinter as tk
 
 window = tk.Tk()
+
+kit = ServoKit(channels=16)
 
 #os.system("sudo pigpiod")
 
@@ -45,11 +48,11 @@ xpidangle = 1500
 ypidangle = 1500
 
 xtarget = 300
-ytarget = 230
+ytarget = 300#230
 
 Kp = 0.5 #best0.5
-Ki = 0.02 #best0.01
-Kd = 8 #best8
+Ki = 0.01 #best0.01
+Kd = 8#best8
 errx = 0
 erix = 0
 errpx = 0
@@ -79,6 +82,9 @@ yrdelay = 0
 delaylistx = []
 delaylisty = []
 
+starttime = time.time()
+prevtime = 0
+longesttime = 0
 
 loop = True
 
@@ -183,7 +189,8 @@ while loop:
 
                 
                 #modelBall.draw(modelBall.x,modelBall.y,rotated)
-                print(xpidangle)
+                
+                    
                 pi.set_servo_pulsewidth(17, xpidangle)
                 pi.set_servo_pulsewidth(27, ypidangle)
                 
@@ -204,7 +211,19 @@ while loop:
         #cv2.imshow("Window 3",masked)
         #cv2.imshow("Window 4",scary)
 
-        
+        print(xpidangle)
+        print('probka: ')
+        print(time.time() - prevtime)
+                
+        if 0.08 >(time.time() - prevtime)>longesttime:
+            longesttime = (time.time() - prevtime)
+                
+        prevtime = time.time()
+                
+                    
+        print('l: ')
+        print(longesttime)
+                
         cv2.waitKey(1)
         
         
